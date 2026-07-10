@@ -32,6 +32,20 @@ Plain scripts, one concern each, no LLM inside. Contract: read config, do the th
 ### Bot (`bot/`)
 Telegram (long-polling — no public endpoint needed). Outbound: alerts (deduped, cooldown), digest, approval requests (inline keyboard). Inbound: allowlisted user only → messages routed into a Claude Code session with the OS skills loaded; destructive intents produce an approval request rather than direct execution.
 
+### Common record schema
+Every unit of work, regardless of which routine/adapter produced it, normalizes to the same shapes in state and the audit log — this is what makes the dashboard, digest, and cost tracking uniform:
+
+- **Task** — what was requested (routine trigger or operator command), which business it belongs to.
+- **Run** — one execution: model used, tools allowed, cost, duration, outcome (`ok | degraded | failed | awaiting_approval`).
+- **Artifact** — what it produced (state JSON, screenshot, draft note, report), with a path.
+- **Approval** — tier, what was shown to the operator, decision, Telegram message ID, timestamp.
+- **Event** — alerts and notable happenings (site down, cert expiring, anomaly).
+
+Flat JSON lines, no database. The headline cost metric is **cost per accepted deliverable** (spend ÷ artifacts the operator actually used/approved), not raw tokens — raw spend appears in the digest, but the ratio is what tells you whether a routine earns its keep.
+
+### Layer discipline
+This system deliberately owns only the durable layers: the command surface (bot + dashboard), orchestration (routines), memory (state + knowledge bridge), and outcomes (audit + cost). It does **not** build an agent runtime, a model router, or an MCP execution layer — those belong to Claude Code / provider SDKs and are consumed through adapters. If a feature idea requires owning one of those layers, it's out of scope.
+
 ### State & memory (`state/`)
 - `state/*.json` — latest result per routine; the dashboard's only data source.
 - `state/agent-memory/` — now.md / tasks.md / log.md, read at session start, written at session end. Keep each file small; the runner truncates log.md beyond N entries (long memory files silently fall out of context).

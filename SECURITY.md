@@ -12,13 +12,20 @@ An agent with write access to DNS, hosting, and email is a high-value target and
 ## Rules
 
 1. **Deny by default.** Headless runs use an explicit `--allowedTools` list per routine. Monitoring routines get read-only tools only.
-2. **Two-step for destructive actions.** Anything marked `destructive: true` (DNS write, nginx reload, service restart, deploy, bulk email, deletion of anything) requires an inline Telegram confirmation from the allowlisted operator. No auto-approve mode for these, ever — approval fatigue is how 93%-approval-rate disasters happen.
+2. **Tiered autonomy, not a binary flag.** Every adapter action declares a risk tier; the tier decides the approval flow:
+   - **Tier 0 — read-only** (checks, fetches, screenshots): autonomous.
+   - **Tier 1 — reversible & internal** (write state files, draft notes, open issues): autonomous, sampled in the digest for review.
+   - **Tier 2 — external but reversible** (clear cache, re-run a deploy of an already-deployed commit, restart a stateless service): Telegram approve-then-learn — approval required until the same action has N clean approvals, then it may be promoted to Tier 1 *explicitly by the operator*.
+   - **Tier 3 — consequential** (DNS record write, nginx config change + reload, new deploy, sending any email): explicit Telegram approval showing a diff/preview of exactly what will change. Never auto-promoted.
+   - **Tier 4 — critical** (payments, deletions of data or infrastructure, anything touching production apps not owned by this system): excluded from the agent entirely, or requires an out-of-band second confirmation. Approval fatigue is how 93%-approval-rate disasters happen — Tier 4 exists so the scary stuff never becomes routine.
 3. **Snapshot before change.** DNS: take a provider-side snapshot before any record write. VPS: snapshot before structural changes. Web server: config test (`nginx -t` or equivalent) is a mandatory gate before any reload.
 4. **Never touch what you don't own.** On shared infrastructure, the agent's writable paths and service names are explicitly enumerated in `config/systems.yml`; everything else is off-limits even if reachable.
 5. **Append-only audit log.** Every adapter call: timestamp, routine/initiator, tool, params (secrets redacted), outcome, approval message ID if gated. `logs/audit.jsonl`, rotated, backed up off the agent-reachable volume.
 6. **Backups live where the agent can't reach them.** An agent that can delete data must not be able to delete the backups of that data.
 7. **Budget caps.** `--max-budget-usd` and `--max-turns` on every unattended invocation.
 8. **Secrets hygiene.** Any credential that has ever appeared in a chat transcript, commit, or shared doc is considered burned — rotate it before the agent goes live.
+9. **MCP is not a security boundary.** Connecting an MCP server grants whatever that server can do; scoping must happen here — tool allowlists per routine, credential scope per adapter, parameter validation, and the tier system above. Never rely on an MCP server to police itself.
+10. **The bot link is outbound-only.** Telegram long-polling means no inbound port, no public webhook endpoint. If that ever changes, the connection must be authenticated and the host firewalled.
 
 ## What the public repo contains vs. what it never will
 

@@ -37,6 +37,13 @@ agent never holds the master copy.
 3. **Promotion is human.** Moving something from `_Inbox/Agent/` into a real
    project note is your call (or a supervised skill run on the vault machine,
    where the full vault is legitimately available).
+4. **Every agent note carries provenance.** Frontmatter must include `source`
+   (which routine/run produced it), `date`, `scope` (which business), and —
+   for anything time-sensitive — `expires`. Expired or superseded notes are
+   candidates for automatic archival, and any note is revocable: deleting it
+   from the vault is the end of it (the mirror never resurrects operator
+   deletions). Memory that can't be corrected or retired is a liability, not
+   an asset.
 
 ## Why not just sync the whole vault?
 

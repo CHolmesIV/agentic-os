@@ -53,7 +53,8 @@ Goal: one page that shows everything.
 
 Goal: adding a capability is writing a file, not a project.
 
-- [ ] `skills/` — each skill is a markdown file (trigger, steps, adapters allowed, guardrails). The orchestrator loads them per run. Document the convention in `docs/SKILLS.md`.
+- [ ] `skills/` — each skill is a markdown file (trigger, steps, adapters allowed, max risk tier, guardrails). The orchestrator loads them per run. Document the convention in `docs/SKILLS.md`.
+- [ ] **Bounded-growth rule:** a new skill or agent role is only justified if it changes at least one of: context loaded, tools/permissions granted, evidence required, evaluation rubric, or cost/latency budget. If none change, it's the same capability with a new name — don't add it. This is the guard against skill sprawl.
 - [ ] Skill-authoring skill: the agent can draft a new skill from a conversation ("learn how to check email deliverability"), you review the diff, merge it.
 - [ ] Candidate expansions (each is one skill + maybe one adapter):
   - email infrastructure health (mailbox warmup, DMARC/SPF/DKIM checks, deliverability)
@@ -71,6 +72,9 @@ Goal: adding a capability is writing a file, not a project.
 - No multi-user support, no auth system beyond the Telegram allowlist + dashboard basic auth.
 - No database. If state outgrows flat JSON, revisit — not before.
 - The OS does not hold business content (proposals, client files); it points at systems that do.
+- No proprietary agent runtime, model router, or visual workflow builder — consume Claude Code / provider SDKs through adapters (see "Layer discipline" in docs/ARCHITECTURE.md).
+- No live agent-activity streaming or animated "virtual office" — watching agents work is theater, not operational value. Status, exceptions, and approvals are the product.
+- No unscoped "giant shared brain" — all agent memory carries scope, source, and expiry (see docs/KNOWLEDGE-BRIDGE.md).
 
 ## Cost discipline
 
