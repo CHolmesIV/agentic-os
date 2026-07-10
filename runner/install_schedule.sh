@@ -55,7 +55,7 @@ fi
 
 # Strip any existing agentic-os managed block from the current crontab.
 strip_managed_block() {
-  crontab -l 2>/dev/null | awk -v b="$MARKER_BEGIN" -v e="$MARKER_END" '
+  { crontab -l 2>/dev/null || true; } | awk -v b="$MARKER_BEGIN" -v e="$MARKER_END" '
     $0==b {skip=1; next}
     $0==e {skip=0; next}
     !skip {print}
