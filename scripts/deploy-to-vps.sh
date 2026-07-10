@@ -39,7 +39,10 @@ else
 fi
 npm install
 npx playwright install chromium --with-deps
-pip install --quiet pyyaml requests dnspython
+command -v python3-venv >/dev/null 2>&1 || apt-get install -y python3-venv >/dev/null 2>&1 || true
+python3 -m venv "$REMOTE_DIR/.venv" 2>/dev/null || { apt-get install -y python3-venv && python3 -m venv "$REMOTE_DIR/.venv"; }
+"$REMOTE_DIR/.venv/bin/pip" install --quiet --upgrade pip
+"$REMOTE_DIR/.venv/bin/pip" install --quiet pyyaml requests dnspython
 echo "remote setup complete"
 REMOTE
 

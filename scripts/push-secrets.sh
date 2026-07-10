@@ -41,6 +41,6 @@ scp "${scp_opts[@]}" config/systems.yml "$target:$REMOTE_DIR/config/systems.yml"
 ssh "${ssh_opts[@]}" "$target" "chmod 600 $REMOTE_DIR/.env"
 
 echo "→ Validating config on the VPS"
-ssh "${ssh_opts[@]}" "$target" "cd $REMOTE_DIR && python3 runner/validate_config.py"
+ssh "${ssh_opts[@]}" "$target" "cd $REMOTE_DIR && ./.venv/bin/python runner/validate_config.py"
 
 echo "✓ Done. Secrets and configs are live on the VPS."
