@@ -21,7 +21,16 @@ ROUTINES_DIR="$REPO_ROOT/routines"
 RUNNER="$REPO_ROOT/runner/run_routine.py"
 MARKER_BEGIN="# >>> agentic-os managed block >>>"
 MARKER_END="# <<< agentic-os managed block <<<"
-PYTHON_BIN="$(command -v python3 || true)"
+# Prefer the project venv (deps live there; system python3 on Ubuntu 24.04
+# is externally-managed and lacks pyyaml/requests/dnspython). Override with
+# PYTHON_BIN=... if needed.
+if [ -n "${PYTHON_BIN:-}" ]; then
+  :
+elif [ -x "$REPO_ROOT/.venv/bin/python" ]; then
+  PYTHON_BIN="$REPO_ROOT/.venv/bin/python"
+else
+  PYTHON_BIN="$(command -v python3 || true)"
+fi
 
 usage() {
   echo "Usage: $0 [--uninstall]" >&2
@@ -96,7 +105,9 @@ for routine in "$ROUTINES_DIR"/*.md; do
   fi
 
   log_file="$REPO_ROOT/logs/cron-$(basename "$routine" .md).log"
-  entry="$schedule cd $REPO_ROOT && $PYTHON_BIN $RUNNER $routine >> $log_file 2>&1"
+  # cron runs with an empty environment; source .env so claude -p and the bot
+  # get ANTHROPIC_API_KEY / TELEGRAM_* etc.
+  entry="$schedule cd $REPO_ROOT && set -a && [ -f .env ] && . ./.env; set +a; $PYTHON_BIN $RUNNER $routine >> $log_file 2>&1"
   new_entries="${new_entries}${entry}"$'\n'
 done
 
