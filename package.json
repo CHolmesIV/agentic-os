@@ -1,0 +1,14 @@
+{
+  "name": "agentic-os",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Adapters and bot glue for the agentic-os operator system (Node side).",
+  "scripts": {
+    "check": "node --check adapters/playwright_check.mjs && node --check bot/telegram.mjs && node --check bot/alerts.mjs && node --check bot/alerts-cli.mjs && node --check bot/send-digest.mjs"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "playwright": "^1.48.0"
+  }
+}
