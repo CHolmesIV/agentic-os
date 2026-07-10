@@ -16,7 +16,16 @@ systems:
       - name: form-relay
         tier: 2
     never_touch:                   # explicit off-limits list, checked by adapters
-      - /var/www/other-production-app
+      # List the ACTUAL paths a co-tenant owns — verify they exist on the box,
+      # don't guess. A never_touch entry that points at a nonexistent path
+      # protects nothing. Include app dirs, nginx confs (both sites-available
+      # AND sites-enabled), and backup dirs.
+      - /opt/other-production-app
+      - /etc/nginx/sites-available/other-app.conf
+      - /etc/nginx/sites-enabled/other-app.conf
+      - /var/backups/other-app
+    never_touch_units: "other-app-*"      # never stop/restart matching systemd units
+    never_touch_databases: [other_app_db] # never touch these databases
     disk_ceiling_pct: 85           # refuse deploys above this usage
     disk_floor_gb: 15               # also refuse if free space would drop below this,
                                      # regardless of percentage — protects co-tenants
