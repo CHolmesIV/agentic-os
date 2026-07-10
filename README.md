@@ -49,7 +49,10 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [PLAN.md](PLAN.md) (phased bui
 
 ## Status
 
-Planning → Phase 1 in progress. See [PLAN.md](PLAN.md).
+**Live.** Phases 0–1 deployed and running in production (2026-07-10): scheduled site monitoring, Telegram alerts, daily digest — with cost guardrails (delta-triggered LLM calls, cheap-model routines, per-call and per-day budget caps, overlap locks). Currently in the one-week unattended soak ([#13](../../issues/13)) that gates Phase 2 (conversational control). See [PLAN.md](PLAN.md) for the roadmap and the issue tracker for progress.
+
+### Cost model in practice
+Adapters are plain scripts — **$0**. The LLM is only invoked when a check's status *changes* (haiku, ≤$0.10) or for the daily digest (strong model, ≤$1.00). A hard `daily_usd` cap is enforced by the runner: when reached, checks keep running and you get an alert, but no further LLM calls happen that day. Typical steady-state cost: **well under $1/day**.
 
 ## License
 
