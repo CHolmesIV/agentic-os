@@ -4,7 +4,7 @@ Phased, each phase ships something usable on its own. Execute top to bottom; don
 
 ## Phase 0 — Foundations (prerequisites, ~1 session)
 
-- [ ] **Secrets hygiene first.** Rotate any credential ever pasted into a chat/transcript or committed to a local doc. Move all secrets into a single `.env` (gitignored) or OS keychain. The orchestrator never gets a credential it doesn't need.
+- [ ] **Centralize secrets.** All credentials the orchestrator needs live in a single `.env` (gitignored) or OS keychain; adapters read from env only. Rotate anything you suspect has leaked. The orchestrator never gets a credential it doesn't need.
 - [ ] Pick the always-on host (a home server, mini PC, or small VPS). Install Claude Code + Node + Python there.
 - [ ] Create the Telegram bot via @BotFather; store the token in `.env`; restrict the bot to your own Telegram user ID (allowlist, hard fail otherwise).
 - [ ] Fill in `config/sites.yml` and `config/systems.yml` from the examples (your real domains, hosts, checks). These files are gitignored.
