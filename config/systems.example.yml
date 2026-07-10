@@ -10,12 +10,16 @@ systems:
     managed_services:              # agent may reload/restart ONLY these
       - name: nginx
         pre_reload_gate: "nginx -t"   # mandatory test before reload
+        reload_only: true              # NEVER restart nginx on a shared box — a
+                                        # restart drops every other vhost's connections
         tier: 3                       # risk tier 0-4, see SECURITY.md
       - name: form-relay
         tier: 2
     never_touch:                   # explicit off-limits list, checked by adapters
       - /var/www/other-production-app
     disk_ceiling_pct: 85           # refuse deploys above this usage
+    disk_floor_gb: 15               # also refuse if free space would drop below this,
+                                     # regardless of percentage — protects co-tenants
 
   dns:
     provider: hostinger
