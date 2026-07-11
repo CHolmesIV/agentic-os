@@ -22,7 +22,11 @@ Read all `state/*.json` and produce one Telegram-sized briefing:
    records with `outcome: failed` or `awaiting_approval`, and total spend
    (sum of run costs) for the period. Call out anything still waiting on
    approval.
-5. **One suggestion** — the single highest-leverage thing to fix or automate
+5. **Social** — if `state/social.json` exists, include a "Social" section:
+   posts going out today/tomorrow per brand, count of unsubmitted approved
+   posts, any failures (flag prominently), and note the data's
+   `generated_at` age if older than 24h.
+6. **One suggestion** — the single highest-leverage thing to fix or automate
    next, based on recurring noise in the logs.
 
 Tone: direct, operator-to-operator, no filler. Hard cap ~300 words.
