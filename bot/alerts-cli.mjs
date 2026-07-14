@@ -29,6 +29,12 @@ const PENDING_PATH = path.join(REPO_ROOT, "state", "pending-alerts.json");
 
 function eventsFromPendingEntry(entry) {
   const ts = entry.ts || new Date().toISOString();
+
+  // Pre-normalized events (from run_routine.py's deterministic alert path).
+  if (Array.isArray(entry.events) && entry.events.length > 0) {
+    return entry.events;
+  }
+
   const llmResult = entry.result || {};
 
   // Common shape: llm_result.results = [{domain, status, detail}, ...]

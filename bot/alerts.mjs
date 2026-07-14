@@ -30,6 +30,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
 const STATE_PATH = path.join(REPO_ROOT, "state", "bot-alerts.json");
 const COOLDOWN_MS = 30 * 60 * 1000;
+const PAGING_STATUSES = new Set(["down"]);
 
 function keyFor(event) {
   return `${event.domain}:${event.kind}`;
@@ -77,6 +78,10 @@ export function evaluateEvent(event, state) {
   const recovered = event.status === "ok" && prior && prior.status !== "ok";
   const statusUnchanged = prior && prior.status === event.status;
   const withinCooldown = prior && now - Date.parse(prior.ts) < COOLDOWN_MS;
+
+  if (!recovered && !PAGING_STATUSES.has(event.status)) {
+    return { shouldSend: false, reason: "non-paging status" };
+  }
 
   if (!recovered) {
     if (statusUnchanged) {
