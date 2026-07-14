@@ -4,7 +4,7 @@ schedule: "*/15 * * * *"
 model: haiku
 llm: on-change
 adapters: [uptime, ssl_dns, forms, playwright_check]
-budget_usd: 0.10
+budget_usd: 0.75
 alert: telegram
 ---
 

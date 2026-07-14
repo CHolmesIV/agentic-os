@@ -474,7 +474,19 @@ def main() -> int:
         state_path.write_text(json.dumps(merged_state, indent=2))
 
     # --- alerts -------------------------------------------------------
-    if frontmatter.get("alert") == "telegram" and llm_result is not None:
+    if frontmatter.get("alert") == "telegram":
+        events: list[dict[str, Any]] = []
+        for doc in current_docs:
+            adapter_name = doc.get("adapter")
+            for result in doc.get("results", []) or []:
+                events.append({
+                    "domain": result.get("domain"),
+                    "kind": adapter_name,
+                    "status": result.get("status"),
+                    "detail": result.get("detail"),
+                    "ts": now_iso(),
+                })
+
         alerts_path = args.state_dir / "pending-alerts.json"
         pending: list[Any] = []
         if alerts_path.exists():
@@ -486,8 +498,9 @@ def main() -> int:
             "routine": name,
             "task_id": task_id,
             "ts": now_iso(),
-            "result": llm_result,
+            "events": events,
         })
+        args.state_dir.mkdir(parents=True, exist_ok=True)
         alerts_path.write_text(json.dumps(pending, indent=2))
         append_audit(audit_path, {
             "type": "Event",
@@ -496,6 +509,13 @@ def main() -> int:
             "ts": now_iso(),
             "note": "alert queued to state/pending-alerts.json",
         })
+
+        if not args.dry_llm:
+            alerts_cli = REPO_ROOT / "bot" / "alerts-cli.mjs"
+            if alerts_cli.exists():
+                subprocess.run(["node", str(alerts_cli)], check=False)
+            else:
+                print(f"WARNING: {alerts_cli} not found; alerts not sent", file=sys.stderr)
 
     # --- morning-digest special case --------------------------------------
     if name == "morning-digest" and not args.dry_llm:
