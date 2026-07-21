@@ -5,10 +5,14 @@
 # run as often as you like (e.g. every time you change a credential).
 set -euo pipefail
 
-# --- VPS target (override via env if these ever change) ----------------------
-VPS_HOST="${VPS_HOST:-srv1797465.hstgr.cloud}"
-VPS_USER="${VPS_USER:-root}"
-VPS_KEY="${VPS_KEY:-$HOME/.ssh/cholmesiv_ed25519}"
+# --- VPS target ---------------------------------------------------------------
+# Real values load from scripts/deploy.env (gitignored); public repo ships
+# placeholders only. Copy scripts/deploy.env.example -> scripts/deploy.env.
+[ -f "$(dirname "$0")/deploy.env" ] && . "$(dirname "$0")/deploy.env"
+
+VPS_HOST="${VPS_HOST:-your-vps-host.example.com}"
+VPS_USER="${VPS_USER:-deploy}"
+VPS_KEY="${VPS_KEY:-$HOME/.ssh/your_deploy_key}"
 REMOTE_DIR="${REMOTE_DIR:-/opt/agentic-os}"
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"

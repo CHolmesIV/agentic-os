@@ -6,9 +6,14 @@
 # other services, or /var/www. It pauses for your confirmation before apt.
 set -euo pipefail
 
-VPS_HOST="${VPS_HOST:-srv1797465.hstgr.cloud}"
-VPS_USER="${VPS_USER:-root}"
-VPS_KEY="${VPS_KEY:-$HOME/.ssh/cholmesiv_ed25519}"
+# Real host/key/user come from scripts/deploy.env (gitignored) so the public
+# repo ships only placeholders. Copy scripts/deploy.env.example to
+# scripts/deploy.env and fill it in.
+[ -f "$(dirname "$0")/deploy.env" ] && . "$(dirname "$0")/deploy.env"
+
+VPS_HOST="${VPS_HOST:-your-vps-host.example.com}"
+VPS_USER="${VPS_USER:-deploy}"
+VPS_KEY="${VPS_KEY:-$HOME/.ssh/your_deploy_key}"
 REMOTE_DIR="${REMOTE_DIR:-/opt/agentic-os}"
 REPO_URL="${REPO_URL:-https://github.com/CHolmesIV/agentic-os.git}"
 
