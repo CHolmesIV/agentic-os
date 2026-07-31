@@ -53,6 +53,10 @@ def check_site(site: dict) -> dict:
         "http_status": None,
         "latency_ms": None,
         "detail": "",
+        # Why the check failed, when it did. Lets downstream tell a config
+        # mistake ("content_mismatch" on a healthy 200) apart from a real
+        # outage. None when the check passed.
+        "failure_kind": None,
     }
 
     if not checks.get("uptime", True):
@@ -88,6 +92,7 @@ def check_site(site: dict) -> dict:
         if not check_host and resp.history:
             final_url = resp.url
             if not _same_site_redirect(domain, final_url):
+                result["failure_kind"] = "cross_domain_redirect"
                 detail_bits.append(
                     f"cross-domain redirect: {domain} -> {urlparse(final_url).hostname}"
                 )
@@ -97,7 +102,23 @@ def check_site(site: dict) -> dict:
         if expect_content:
             content_ok = expect_content in resp.text
             if not content_ok:
-                detail_bits.append(f"expected content '{expect_content}' not found")
+                # A healthy 2xx/3xx whose expected string is missing is far
+                # more often a stale expect_content than a defaced site.
+                # Say so, and point at the validator rather than at the host.
+                result["failure_kind"] = (
+                    "content_mismatch"
+                    if 200 <= resp.status_code < 400
+                    else "content_mismatch_on_error_page"
+                )
+                detail_bits.append(
+                    f"expected content '{expect_content}' not found"
+                    + (
+                        " (HTTP was healthy — verify expect_content with"
+                        " scripts/validate_sites.py before treating as an outage)"
+                        if 200 <= resp.status_code < 400
+                        else ""
+                    )
+                )
 
         if 200 <= resp.status_code < 400 and content_ok and not any(
             "cross-domain" in b for b in detail_bits
@@ -117,6 +138,7 @@ def check_site(site: dict) -> dict:
     except requests.exceptions.RequestException as e:
         result["latency_ms"] = round((time.monotonic() - start) * 1000, 1)
         result["status"] = "down"
+        result["failure_kind"] = "unreachable"
         result["detail"] = f"request failed: {e}"
 
     return result

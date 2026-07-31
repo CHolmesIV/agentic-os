@@ -15,8 +15,10 @@
  *   - Dedup key = `${domain}:${kind}`. The same (domain, kind) pair with an
  *     unchanged status does not re-alert.
  *   - 30-minute cooldown per key even when status *has* changed, to avoid
- *     flapping spam — EXCEPT a RECOVERED transition (status back to "ok"
- *     after a non-ok alert) always sends, referencing the prior alert.
+ *     flapping spam — EXCEPT a RECOVERED transition always sends,
+ *     referencing the prior alert. A RECOVERED transition is either a
+ *     return to "ok" from any non-ok state, or a departure from "down"
+ *     into a less-severe state (reported as PARTIAL RECOVERY).
  *   - Last-alert state persisted at state/bot-alerts.json:
  *     { "<domain>:<kind>": { status, ts, message_ts } }
  */
@@ -50,11 +52,32 @@ export function saveAlertState(state) {
   writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
 }
 
+/**
+ * A recovery is EITHER a full return to "ok" from any non-ok state, OR a
+ * departure from "down" into a less-severe state (e.g. down -> degraded).
+ *
+ * The second case matters: before this, a site that came back up but still
+ * failed a secondary check (content match, etc) landed in "degraded", which
+ * is neither "ok" nor a paging status. It therefore never sent a recovery
+ * AND never updated stored state, so the key stayed pinned at "down"
+ * indefinitely and every later transition was suppressed as "unchanged".
+ */
+function recoveryFor(event, prior) {
+  if (!prior) return { recovered: false };
+  const leftDown = prior.status === "down" && event.status !== "down";
+  const backToOk = prior.status !== "ok" && event.status === "ok";
+  return { recovered: leftDown || backToOk };
+}
+
 function formatMessage(event, prior) {
-  const recovered = event.status === "ok" && prior && prior.status !== "ok";
+  const { recovered } = recoveryFor(event, prior);
   if (recovered) {
+    const headline =
+      event.status === "ok"
+        ? `RECOVERED: ${event.domain} [${event.kind}] is back to ok.`
+        : `PARTIAL RECOVERY: ${event.domain} [${event.kind}] is no longer down (now ${event.status}).`;
     return (
-      `RECOVERED: ${event.domain} [${event.kind}] is back to ok.\n` +
+      `${headline}\n` +
       `Prior alert: ${prior.status} at ${prior.ts}${prior.detail ? ` — ${prior.detail}` : ""}\n` +
       (event.detail ? `Detail: ${event.detail}` : "")
     ).trim();
@@ -75,7 +98,7 @@ export function evaluateEvent(event, state) {
   const prior = state[key];
   const now = event.ts ? Date.parse(event.ts) : Date.now();
 
-  const recovered = event.status === "ok" && prior && prior.status !== "ok";
+  const { recovered } = recoveryFor(event, prior);
   const statusUnchanged = prior && prior.status === event.status;
   const withinCooldown = prior && now - Date.parse(prior.ts) < COOLDOWN_MS;
 
