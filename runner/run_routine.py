@@ -23,6 +23,7 @@ is a normal outcome, not a runner failure).
 from __future__ import annotations
 
 import argparse
+import calendar
 import copy
 import json
 import re
@@ -255,18 +256,90 @@ def append_pending_alert(state_dir: Path, alert: dict[str, Any]) -> None:
 # LLM invocation
 # --------------------------------------------------------------------------
 
+STATE_EXCLUDE_SUFFIXES = (".pre17",)
+STATE_EXCLUDE_NAMES = {"pending-alerts.json"}
+
+
+def gather_state_files(state_dir: Path) -> dict[str, Any]:
+    """Inline every state/*.json (excluding backups/pending-alerts) for
+    routines that have no adapters to call Read on themselves."""
+    out: dict[str, Any] = {}
+    if not state_dir.exists():
+        return out
+    for p in sorted(state_dir.glob("*.json")):
+        name = p.name
+        if ".bak" in name or name in STATE_EXCLUDE_NAMES or name.endswith(STATE_EXCLUDE_SUFFIXES):
+            continue
+        try:
+            out[name] = json.loads(p.read_text())
+        except Exception as exc:  # noqa: BLE001
+            out[name] = {"_error": f"failed to parse {name}: {exc}"}
+    return out
+
+
+def gather_recent_audit(logs_dir: Path, hours: int = 24, cap: int = 400) -> list[dict[str, Any]]:
+    """Return the last `cap` audit.jsonl records with a `ts` in the last `hours`."""
+    audit_path = logs_dir / "audit.jsonl"
+    if not audit_path.exists():
+        return []
+    cutoff = time.time() - hours * 3600
+    records: list[dict[str, Any]] = []
+    try:
+        lines = audit_path.read_text().splitlines()
+    except Exception:  # noqa: BLE001
+        return []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        ts = rec.get("ts")
+        if not ts:
+            continue
+        try:
+            ts_epoch = calendar.timegm(time.strptime(ts, "%Y-%m-%dT%H:%M:%SZ"))
+        except Exception:  # noqa: BLE001
+            continue
+        if ts_epoch < cutoff:
+            continue
+        records.append(rec)
+    return records[-cap:]
+
+
 def build_claude_command(
     frontmatter: dict[str, Any],
     body: str,
     current_docs: list[dict[str, Any]],
     previous_state: dict[str, Any] | None,
+    state_dir: Path,
+    logs_dir: Path,
 ) -> tuple[list[str], str]:
     """Build the `claude -p` command + full prompt text."""
-    prompt_payload = {
-        "current_results": current_docs,
-        "previous_results": (previous_state or {}).get("adapters", []),
-    }
-    prompt = body + "\n\n---\n\n```json\n" + json.dumps(prompt_payload, indent=2) + "\n```"
+    adapter_names = frontmatter.get("adapters") or []
+    if not adapter_names:
+        # No adapters configured (e.g. morning-digest) — the routine has no
+        # tool calls it can make to gather its own context (only Read is
+        # allowed, and there's nothing adapter-shaped to read from state for
+        # this run), so inline everything it needs directly into the prompt.
+        inline_payload = {
+            "state_files": gather_state_files(state_dir),
+            "audit_last_24h": gather_recent_audit(logs_dir),
+        }
+        prompt = (
+            body
+            + "\n\n---\n\n```json\n"
+            + json.dumps(inline_payload, indent=2, default=str)
+            + "\n```"
+        )
+    else:
+        prompt_payload = {
+            "current_results": current_docs,
+            "previous_results": (previous_state or {}).get("adapters", []),
+        }
+        prompt = body + "\n\n---\n\n```json\n" + json.dumps(prompt_payload, indent=2) + "\n```"
 
     cmd = ["claude", "-p", prompt]
 
@@ -282,7 +355,7 @@ def build_claude_command(
 
     cmd += ["--output-format", "json"]
     cmd += ["--allowedTools", "Read"]
-    cmd += ["--max-turns", "3"]
+    cmd += ["--max-turns", "6"]
 
     return cmd, prompt
 
@@ -439,7 +512,9 @@ def main() -> int:
                 "note": "budget cap alert queued to state/pending-alerts.json",
             })
         else:
-            cmd, _prompt = build_claude_command(frontmatter, body, current_docs, previous_state)
+            cmd, _prompt = build_claude_command(
+                frontmatter, body, current_docs, previous_state, args.state_dir, args.logs_dir
+            )
             if args.dry_llm:
                 print(" ".join(_shell_quote(c) for c in cmd))
             elif should_invoke_llm:
@@ -447,6 +522,20 @@ def main() -> int:
                 cost = None
                 if isinstance(llm_result, dict):
                     cost = llm_result.get("total_cost_usd") or llm_result.get("cost_usd")
+                    if cost is None:
+                        # Even a failed run (e.g. error_max_turns) may have a
+                        # parseable JSON blob in `raw` carrying total_cost_usd —
+                        # without this, failed runs record cost: null and spend
+                        # tracking silently misses them.
+                        raw = llm_result.get("raw")
+                        if raw:
+                            try:
+                                raw_parsed = json.loads(raw)
+                            except (json.JSONDecodeError, TypeError):
+                                raw_parsed = None
+                            if isinstance(raw_parsed, dict):
+                                cost = raw_parsed.get("total_cost_usd") or raw_parsed.get("cost_usd")
+                llm_failed = bool(llm_result and llm_result.get("error"))
                 append_audit(audit_path, {
                     "type": "Run",
                     "id": new_id("run"),
@@ -455,9 +544,17 @@ def main() -> int:
                     "tool": "claude -p",
                     "params": {"model": frontmatter.get("model", "strong"), "budget_usd": routine_budget_usd},
                     "cost": cost,
-                    "outcome": "failed" if llm_result and llm_result.get("error") else "ok",
+                    "outcome": "failed" if llm_failed else "ok",
                     "ts": now_iso(),
                 })
+
+                digest_output = frontmatter.get("digest_output")
+                if digest_output and not llm_failed and isinstance(llm_result, dict):
+                    result_text = llm_result.get("result")
+                    if isinstance(result_text, str) and result_text.strip():
+                        out_path = REPO_ROOT / digest_output
+                        out_path.parent.mkdir(parents=True, exist_ok=True)
+                        out_path.write_text(result_text.strip() + "\n")
 
     # --- merge + write state ---------------------------------------------
     merged_state = {

@@ -13,6 +13,29 @@ VPS-level change.
 
 ---
 
+## [2026-09-02] — Morning digest repaired; fleet config corrected
+
+Working tree (uncommitted, deployed live): `runner/run_routine.py`, `routines/morning-digest.md`,
+`adapters/ssl_dns.py`; env-only: `config/sites.yml`, `config/systems.yml`, `/etc/logrotate.d/agentic-os`.
+
+- **morning-digest had failed every run since mid-July** with `error_max_turns`: the routine told
+  the model to read `state/*.json` + `logs/audit.jsonl` and *write* `state/digest-latest.md`, but the
+  runner passed `--allowedTools Read --max-turns 3`. Fix: for adapter-less routines the runner now
+  inlines all `state/*.json` (minus backups/pending-alerts) and the last 24h/400 audit records into the
+  prompt; new frontmatter key `digest_output` makes the runner write the model's `result` to that path;
+  `--max-turns 6`; failed runs now record `total_cost_usd` from the raw JSON instead of null.
+  First successful digest sent 2026-09-02 (about USD 0.45 on the CLI default model; consider mapping `strong`).
+- `adapters/ssl_dns.py`: new per-site `dns_drift_expected: true` downgrades DNS drift to `ok` with a note
+  (CDN-hosted sites rotate IPs; was ~96 false `degraded` results/day).
+- `config/sites.yml` (env): wrong domain corrected (a plural typo pointed at a site the operator does
+  not own); four migrated sites moved to `host: vps` with current notes; drift flag on two CDN sites.
+  Form liveness checks were evaluated and NOT added: a well-formed test POST is accepted by the relay
+  and sends a real email, so a 15-minute check would spam inboxes. Needs a relay health endpoint first.
+- `config/systems.yml` (env): stale disk-usage comment corrected (12%, not 75%).
+- Logrotate for `logs/*.jsonl` and `logs/*.log` (weekly, keep 8, compress, copytruncate).
+- Known: `playwright_check` runs with zero targets (all sites `playwright: false`) while 646 MB of
+  browsers sit in `~/.cache/ms-playwright`; working tree also carries uncommitted 2026-07-30 changes.
+
 ## [2026-07-30] — Site-health alerting: recovery hole closed (false outage on maricured.com)
 
 Working tree at time of writing: `adapters/uptime.py`, `bot/alerts.mjs`,

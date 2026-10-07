@@ -157,9 +157,15 @@ def check_site(site: dict) -> dict:
     dns_records = lookup_dns(domain)
     drift = snapshot_and_diff(domain, dns_records)
     if drift:
-        if result["status"] == "ok":
-            result["status"] = "degraded"
-        detail_bits.append("DNS drift detected: " + " | ".join(drift))
+        if site.get("dns_drift_expected"):
+            detail_bits.append(
+                "DNS drift detected but expected for this site (dns_drift_expected: true — "
+                "e.g. Hostinger CDN rotating IPs): " + " | ".join(drift)
+            )
+        else:
+            if result["status"] == "ok":
+                result["status"] = "degraded"
+            detail_bits.append("DNS drift detected: " + " | ".join(drift))
     else:
         detail_bits.append("DNS unchanged since last snapshot")
 

@@ -6,6 +6,7 @@ llm: always
 adapters: []
 budget_usd: 1.00
 alert: telegram
+digest_output: state/digest-latest.md
 ---
 
 # Morning Digest
@@ -31,5 +32,4 @@ Read all `state/*.json` and produce one Telegram-sized briefing:
 
 Tone: direct, operator-to-operator, no filler. Hard cap ~300 words.
 
-Write the finished digest to `state/digest-latest.md` — this is what gets
-sent to Telegram.
+Output ONLY the finished digest text, nothing else.
