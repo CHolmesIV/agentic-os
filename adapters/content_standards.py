@@ -65,7 +65,7 @@ def save_cache(c):
 
 
 def visible_text(doc):
-    doc = re.sub(r"(?is)<(script|style|noscript|svg)\b.*?</\1>", " ", doc)
+    doc = re.sub(r"(?is)<!--.*?-->|<(script|style|noscript|svg)\b.*?</\1>", " ", doc)
     return html.unescape(re.sub(r"<[^>]+>", " ", doc))
 
 
@@ -121,8 +121,8 @@ def audit_site(site, deadline):
             if gid not in doc:
                 broken.append(f"{path} missing analytics {gid}")
         title = html.unescape((re.search(r"(?is)<title>(.*?)</title>", doc) or [None, ""])[1]).strip()
-        desc_m = re.search(r'<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']*)', doc, re.I)
-        desc = html.unescape(desc_m.group(1)).strip() if desc_m else ""
+        desc_m = re.search(r'<meta[^>]+name=["\']description["\'][^>]+content=(["\'])(.*?)\1', doc, re.I | re.S)
+        desc = html.unescape(desc_m.group(2)).strip() if desc_m else ""
         if not 30 <= len(title) <= 60:
             warn.append(f"{path} title {len(title)} chars")
         if not 70 <= len(desc) <= 160:
