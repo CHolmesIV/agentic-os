@@ -3,7 +3,7 @@ name: site-health
 schedule: "*/15 * * * *"
 model: haiku
 llm: on-change
-adapters: [uptime, ssl_dns, forms, playwright_check]
+adapters: [uptime, ssl_dns, forms, latency, page_weight, playwright_check]
 budget_usd: 0.75
 alert: telegram
 ---
@@ -22,6 +22,13 @@ only because something changed since the last run.
      matches that expectation. This is expected behavior, not a failure —
      never alert this as down.
    - **DOWN** — failing in a way not covered by an explicit expected status.
+     A `forms` result of `down` means the contact form cannot send mail —
+     real leads are being lost; say so plainly.
+   - **SLOW** — `latency` status `slow`: sustained (last-hour median over
+     budget and 2x the 7-day baseline), never a single sample. Name the
+     numbers from `detail`; first step: check the host, not the monitor.
+   - **HEAVY** — `page_weight` status `heavy`: homepage bytes over budget.
+     Name the largest assets from `detail`; first step: re-encode images.
 3. DOWN or unexpected degradation → emit an alert: site, what failed, since
    when, first debugging step to try. RECOVERED → emit an all-clear that
    references the original alert.

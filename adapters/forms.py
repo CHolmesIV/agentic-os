@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
-"""Forms adapter — Tier 0 in --dry-run, Tier 2 for a real submission.
+"""Forms adapter — Tier 0, read-only. Never submits a form.
 
-Reads config/sites.yml. For each site with a `checks.form` block, POSTs a
-clearly-marked automated test payload (honeypot field left empty) to
-`<domain><endpoint>` and classifies the result:
-  - ok              : response status matches the site's happy-path expectation
-  - known-degraded  : response status matches the configured expect_status
-                       and that status is >= 400 (an intentionally-tolerated
-                       failure mode, e.g. the akatsinc.com relay's 503)
-  - down            : anything else
+Asks the local form relay (127.0.0.1:8787) whether each relay-backed site can
+send mail: GET /health?site=<domain>. The relay reports whether that site's
+SMTP credentials are loaded and, at most every 6h, does a real SMTP login
+(no message sent). nginx never forwards /health, and the relay refuses it
+from anything that isn't a direct localhost call.
 
---dry-run is required for real network POSTs to be skipped in favor of a
-local no-op simulation — this session only ever runs with --dry-run;
-omitting it performs a real POST and should only be used deliberately.
+Replaces the old POST-a-test-payload design (2026-10-07): the relay accepts
+a well-formed POST and emails it, so a recurring check would have sent real
+mail every 15 minutes.
 
-Prints ONE JSON document to stdout: {adapter, ts, results:[...]}.
+Sites opt in with `checks.form: {via: relay}` in config/sites.yml.
+
+Status:
+  - ok   : relay up, creds loaded, last SMTP login succeeded
+  - down : relay unreachable, site unknown to the relay, creds missing, or
+           SMTP login failing — real leads are being lost
 """
-import argparse
 import json
 import sys
 from datetime import datetime, timezone
@@ -27,17 +28,8 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SITES_PATH = REPO_ROOT / "config" / "sites.yml"
-TIMEOUT_SECONDS = 10
-USER_AGENT = "agentic-os-forms-adapter/1.0 (automated-test)"
-
-TEST_PAYLOAD = {
-    "name": "Agentic OS Automated Test",
-    "email": "automated-test@agentic-os.invalid",
-    "message": "This is an automated form-health test submission from agentic-os/adapters/forms.py. "
-    "No action needed.",
-    "honeypot": "",  # must stay empty — a filled honeypot would look like a bot to the real relay
-    "_automated_test": "true",
-}
+RELAY_HEALTH = "http://127.0.0.1:8787/health"
+TIMEOUT_SECONDS = 20  # first call per 6h includes an SMTP login
 
 
 def load_sites() -> list[dict]:
@@ -46,98 +38,41 @@ def load_sites() -> list[dict]:
     return data.get("sites", [])
 
 
-def check_form(site: dict, dry_run: bool) -> dict | None:
-    domain = site.get("domain", "unknown")
-    checks = site.get("checks", {}) or {}
-    form = checks.get("form")
-    if not form:
-        return None  # no form configured for this site — not a result row
-
-    endpoint = form.get("endpoint", "/submit")
-    expect_status = form.get("expect_status", 200)
-    url = f"https://{domain}{endpoint}"
-
-    result = {
-        "domain": domain,
-        "status": "down",
-        "http_status": None,
-        "latency_ms": None,
-        "detail": "",
-    }
-
-    if dry_run:
-        result["status"] = "ok"
-        result["detail"] = (
-            f"DRY RUN — would POST test payload to {url}; "
-            f"configured expect_status={expect_status}. No network call made."
-        )
-        return result
-
-    import time
-
-    start = time.monotonic()
+def check(domain: str) -> dict:
+    result = {"domain": domain, "status": "down", "detail": ""}
     try:
-        resp = requests.post(
-            url,
-            json=TEST_PAYLOAD,
-            headers={"User-Agent": USER_AGENT},
-            timeout=TIMEOUT_SECONDS,
-        )
-        result["latency_ms"] = round((time.monotonic() - start) * 1000, 1)
-        result["http_status"] = resp.status_code
-
-        if resp.status_code == expect_status and expect_status >= 400:
-            result["status"] = "known-degraded"
-            result["detail"] = f"status {resp.status_code} matches configured known-degraded expect_status"
-        elif 200 <= resp.status_code < 300:
-            result["status"] = "ok"
-            result["detail"] = f"status {resp.status_code}, form accepted the test submission"
-        else:
-            result["status"] = "down"
-            result["detail"] = (
-                f"status {resp.status_code} does not match expect_status={expect_status} "
-                f"and is not a 2xx success"
-            )
-    except requests.exceptions.Timeout:
-        result["latency_ms"] = round((time.monotonic() - start) * 1000, 1)
-        result["status"] = "down"
-        result["detail"] = f"timeout after {TIMEOUT_SECONDS}s posting to {url}"
-    except requests.exceptions.RequestException as e:
-        result["latency_ms"] = round((time.monotonic() - start) * 1000, 1)
-        result["status"] = "down"
-        result["detail"] = f"request failed: {e}"
-
+        resp = requests.get(RELAY_HEALTH, params={"site": domain}, timeout=TIMEOUT_SECONDS)
+        h = resp.json()
+    except (requests.exceptions.RequestException, ValueError) as e:
+        result["detail"] = f"form relay unreachable on 127.0.0.1:8787 ({e.__class__.__name__}) — check `systemctl status form-relay`"
+        return result
+    if not h.get("known"):
+        result["detail"] = "site missing from /opt/form-relay/sites.json"
+    elif not h.get("configured"):
+        result["detail"] = "relay has no SMTP credentials for this site — submissions return 503"
+    elif h.get("smtp") != "ok":
+        result["detail"] = f"SMTP login failing: {h.get('smtpError') or 'unknown error'} (checked {h.get('checkedAt')})"
+    else:
+        result["status"] = "ok"
+        result["detail"] = f"relay ready, SMTP login ok (checked {h.get('checkedAt')}), spam check: {h.get('jsCheck')}"
     return result
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Form-health adapter")
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Simulate only — no real network POST. Use this for all testing.",
-    )
-    args = parser.parse_args()
-
     try:
         sites = load_sites()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(json.dumps({"adapter": "forms", "error": str(e)}), file=sys.stderr)
         return 1
 
-    results = []
-    for site in sites:
-        r = check_form(site, dry_run=args.dry_run)
-        if r is not None:
-            results.append(r)
+    results = [check(s["domain"]) for s in sites
+               if s.get("domain") and ((s.get("checks") or {}).get("form") or {}).get("via") == "relay"]
 
-    doc = {
+    print(json.dumps({
         "adapter": "forms",
         "ts": datetime.now(timezone.utc).isoformat(),
-        "dry_run": args.dry_run,
         "results": results,
-    }
-    print(json.dumps(doc, indent=2))
+    }, indent=2))
     return 0
 
 

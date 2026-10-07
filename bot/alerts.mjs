@@ -32,7 +32,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
 const STATE_PATH = path.join(REPO_ROOT, "state", "bot-alerts.json");
 const COOLDOWN_MS = 30 * 60 * 1000;
-const PAGING_STATUSES = new Set(["down"]);
+// "slow" (latency adapter: sustained, not one sample) and "heavy" (page_weight
+// adapter: homepage over budget) page once on entry and once on recovery.
+const PAGING_STATUSES = new Set(["down", "slow", "heavy"]);
 
 function keyFor(event) {
   return `${event.domain}:${event.kind}`;

@@ -7,9 +7,10 @@ sites:
       expect_content: "Welcome"   # string that must appear on /
       ssl: true
       form:
-        endpoint: /submit
-        expect_status: 200         # use the honest current status; 503 = known-degraded
+        via: relay                 # probe the local form relay's /health (never submits)
       playwright: true
+      page_weight: true            # default; false to skip the daily homepage-bytes check
+    latency_budget_ms: 800         # optional; default 800 for host: vps, 2000 otherwise
     deploy:                        # optional; enables "deploy <site>" command
       repo: yourname/example-website
       target: /var/www/example.com

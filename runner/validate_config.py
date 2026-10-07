@@ -84,13 +84,10 @@ def validate_sites(data: dict, errors: list[str]) -> None:
             if form is not None:
                 if not isinstance(form, dict):
                     errors.append(f"{path}.checks.form: must be a mapping")
-                else:
-                    if "endpoint" not in form or not isinstance(form.get("endpoint"), str):
-                        errors.append(f"{path}.checks.form.endpoint: required string")
-                    if "expect_status" not in form or not isinstance(
-                        form.get("expect_status"), int
-                    ):
-                        errors.append(f"{path}.checks.form.expect_status: required int")
+                elif form.get("via") != "relay":
+                    # forms.py only probes the relay's /health (2026-10-07); the old
+                    # endpoint/expect_status POST design sent real email and is gone.
+                    errors.append(f"{path}.checks.form.via: must be 'relay'")
 
         if "check_host" in site and not isinstance(site["check_host"], str):
             errors.append(f"{path}.check_host: must be a string")

@@ -13,6 +13,26 @@ VPS-level change.
 
 ---
 
+## [2026-10-07] — Spam-safe form monitoring, sustained-latency and page-weight alerts
+
+- **`adapters/forms.py` rewritten.** It no longer POSTs anything (the old design would have emailed a
+  test lead every 15 min if enabled). It calls the form relay's new localhost-only `GET /health?site=`,
+  which reports whether SMTP creds are loaded and does an SMTP login at most every 6h. Sites opt in
+  with `checks.form: {via: relay}` (validate_config updated to match). `down` = the contact form cannot send mail.
+- **New `adapters/latency.py`.** One HTML GET per site per cycle into a 7-day history at
+  `state/history/latency.json` (subdirectory, so the digest doesn't inline it). `slow` only when the
+  last-hour median is over budget AND at least 2x the 7-day baseline (or the baseline is itself over
+  budget). One slow sample never pages.
+- **New `adapters/page_weight.py`.** Daily, sums the wire bytes of everything the homepage references.
+  `heavy` at >3 MB total or any asset >1 MB. Skips `host: external` and `check_host` sites.
+  First run: maricured.com (live WordPress) 12.8 MB, hero PNGs ~1.9 MB each.
+- `bot/alerts.mjs`: `slow` and `heavy` are paging statuses (one alert on entry, one on recovery).
+- `runner/run_routine.py`: `sonnet` model alias; the per-cycle pending-alerts queue is kept (needed
+  so cooldown-suppressed changes are re-evaluated) but only logged to the audit trail on change.
+- `routines/morning-digest.md`: runs on `sonnet`; speed is mentioned only when `latency`/`page_weight`
+  says so (no more raw-millisecond commentary); stale (>7d) social feed collapses to one line.
+- `routines/site-health.md`: adds `latency` and `page_weight`; SLOW/HEAVY classes.
+
 ## [2026-09-02] — Morning digest repaired; fleet config corrected
 
 Working tree (uncommitted, deployed live): `runner/run_routine.py`, `routines/morning-digest.md`,

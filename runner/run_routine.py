@@ -44,6 +44,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 MODEL_MAP = {
     "haiku": "claude-haiku-4-5-20251001",
+    # CLI alias -> current Sonnet. Digest moved here from "strong" 2026-10-07 (cost).
+    "sonnet": "sonnet",
     # "strong" -> omit --model, inherit the CLI's default model
 }
 
@@ -599,13 +601,19 @@ def main() -> int:
         })
         args.state_dir.mkdir(parents=True, exist_ok=True)
         alerts_path.write_text(json.dumps(pending, indent=2))
-        append_audit(audit_path, {
-            "type": "Event",
-            "id": new_id("evt"),
-            "routine": name,
-            "ts": now_iso(),
-            "note": "alert queued to state/pending-alerts.json",
-        })
+        # Queuing every cycle is deliberate: alerts.mjs decides what to send, and
+        # a change suppressed by its 30-min cooldown must be re-evaluated on later
+        # unchanged cycles or it would never send. Only *log* it when something
+        # changed, so the audit trail (and the digest's view of it) isn't ~96
+        # identical lines a day.
+        if changed:
+            append_audit(audit_path, {
+                "type": "Event",
+                "id": new_id("evt"),
+                "routine": name,
+                "ts": now_iso(),
+                "note": "status change queued to state/pending-alerts.json",
+            })
 
         if not args.dry_llm:
             alerts_cli = REPO_ROOT / "bot" / "alerts-cli.mjs"
