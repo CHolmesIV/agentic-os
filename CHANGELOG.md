@@ -13,6 +13,17 @@ VPS-level change.
 
 ---
 
+## [2026-10-07, night] — Weekly first-party traffic report
+
+- **New `reports/traffic_report.py`** (not an adapter: it pages nothing). It reads the nginx access logs on this box and the form relay's outcome lines in journald, and writes `state/history/traffic.json` plus `state/history/traffic-latest.md`. `--send` posts the markdown to Telegram through `bot/send-digest.mjs`. Per site, last 7 days:
+  - human pageviews and approximate visitors (one per IP + user agent per day; nothing stored beyond a truncated hash)
+  - top pages, top external referrers, human 404s
+  - Googlebot and AI-crawler hits, so a site Google isn't crawling stands out
+  - form submissions: delivered, tagged spam, blocked
+- **Filtering:** bot user agents are dropped. So is any IP that probed scanner paths (`.env`, `wp-admin`, `.git`), whatever user agent it sent. Backlink-spam referrer domains are dropped too. A site with less than a full window of data is labelled "data since <date>" rather than flagged.
+- Outputs sit in `state/history/` on purpose, so the morning digest (which reads `state/*.json`) doesn't pay to read them.
+- **Env-only:** every static vhost now logs with the `vhost` format (`$host` first). Three vhosts had been on the default combined format, so their traffic couldn't be attributed. Cron: Mondays 13:00 UTC, outside the managed block.
+
 ## [2026-10-07, later] — Content standards and hosting checks
 
 - **New `adapters/content_standards.py`** (daily, cached in `state/history/content-standards.json`). Per site it crawls the sitemap and homepage and returns:
