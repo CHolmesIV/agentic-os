@@ -13,6 +13,18 @@ VPS-level change.
 
 ---
 
+## [2026-10-07, later] — Content standards and hosting checks
+
+- **New `adapters/content_standards.py`** (daily, cached in `state/history/content-standards.json`). Per site it crawls the sitemap and homepage and returns:
+  - `broken` (pages): any page is noindex, an expected analytics id (`analytics:` in sites.yml) is missing, or an internal link is dead.
+  - `warn` (house style, never pages): em dashes in copy, title outside 30-60 chars, description outside 70-160 chars, missing canonical.
+  - It audits the public domain even for `check_host` sites. A Hostinger CDN bot-challenge page is reported as "not measured", not as a failure.
+  - It would have caught akatsinc.com shipping `noindex` on every page from May to October 2026.
+- **New `adapters/hosting.py`.** Every `host: vps` site must resolve to the VPS (`systems.vps_ip`, default 2.25.74.178), or it returns `off_vps`, which pages. Built because maricured and fiveoaks sat on old hosting for months after being staged on the VPS.
+- `bot/alerts.mjs`: `broken` and `off_vps` are paging statuses.
+- `routines/site-health.md`: both adapters added, with CONTENT BROKEN / OFF VPS classes. `routines/morning-digest.md`: one Content line and one Hosting line.
+- `config/sites.yml` (env): an `analytics:` list per site.
+
 ## [2026-10-07] — Spam-safe form monitoring, sustained-latency and page-weight alerts
 
 - **`adapters/forms.py` rewritten.** It no longer POSTs anything (the old design would have emailed a

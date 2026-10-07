@@ -21,6 +21,10 @@ Read all `state/*.json` and produce one Telegram-sized briefing:
    asset). Do not narrate raw response times or compare them day to day —
    single samples are noise and those numbers mean nothing to the reader.
    Forms: one line — relay-backed forms ok, or which site's form is down.
+   Content: one line from `content_standards` — any `broken` site first
+   (noindex, missing analytics, dead link), then a count of sites with
+   house-style `warn` items (em dashes, title 30-60 / description 70-160
+   chars). Hosting: name any `off_vps` site.
 3. **Deadlines & pipeline** — from configured business sources (bids due,
    client deliverables, filings).
 4. **Yesterday's agent activity** — read the tail of `logs/audit.jsonl` for

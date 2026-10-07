@@ -34,7 +34,9 @@ const STATE_PATH = path.join(REPO_ROOT, "state", "bot-alerts.json");
 const COOLDOWN_MS = 30 * 60 * 1000;
 // "slow" (latency adapter: sustained, not one sample) and "heavy" (page_weight
 // adapter: homepage over budget) page once on entry and once on recovery.
-const PAGING_STATUSES = new Set(["down", "slow", "heavy"]);
+// "broken" (content_standards: noindex, missing analytics, dead internal link)
+// and "off_vps" (hosting: domain not pointed at the VPS) added 2026-10-07.
+const PAGING_STATUSES = new Set(["down", "slow", "heavy", "broken", "off_vps"]);
 
 function keyFor(event) {
   return `${event.domain}:${event.kind}`;

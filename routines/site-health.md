@@ -3,7 +3,7 @@ name: site-health
 schedule: "*/15 * * * *"
 model: haiku
 llm: on-change
-adapters: [uptime, ssl_dns, forms, latency, page_weight, playwright_check]
+adapters: [uptime, ssl_dns, forms, latency, page_weight, content_standards, hosting, playwright_check]
 budget_usd: 0.75
 alert: telegram
 ---
@@ -29,6 +29,13 @@ only because something changed since the last run.
      numbers from `detail`; first step: check the host, not the monitor.
    - **HEAVY** — `page_weight` status `heavy`: homepage bytes over budget.
      Name the largest assets from `detail`; first step: re-encode images.
+   - **CONTENT BROKEN** — `content_standards` status `broken`: a page is
+     noindex, an expected analytics tag is missing, or an internal link is
+     dead. Quote the first items from `detail`. `warn` (em dashes, title or
+     description length, missing canonical) is house-style drift, never an
+     alert.
+   - **OFF VPS** — `hosting` status `off_vps`: the domain is not pointed at
+     the VPS, so visitors get old hosting. First step: the site's DNS cutover.
 3. DOWN or unexpected degradation → emit an alert: site, what failed, since
    when, first debugging step to try. RECOVERED → emit an all-clear that
    references the original alert.
