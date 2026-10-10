@@ -13,6 +13,13 @@ VPS-level change.
 
 ---
 
+## [2026-10-10]
+### Fixed
+- `content_standards`: the internal-link crawl read raw HTML including inline scripts, so a JS template literal
+  (`href="${f.url}"`) was crawled as a link and reported as a 404 on every cycle, a false "broken" red flag.
+  Links are now taken only from the page's markup (comments and `<script>`, `<style>`, `<template>`, `<noscript>`
+  bodies removed), and any href still containing `${` or `{{` is skipped.
+
 ## [2026-10-07, night] — Weekly first-party traffic report
 
 - **New `reports/traffic_report.py`** (not an adapter: it pages nothing). It reads the nginx access logs on this box and the form relay's outcome lines in journald, and writes `state/history/traffic.json` plus `state/history/traffic-latest.md`. `--send` posts the markdown to Telegram through `bot/send-digest.mjs`. Per site, last 7 days:

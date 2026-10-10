@@ -64,6 +64,12 @@ def save_cache(c):
     tmp.replace(CACHE_PATH)
 
 
+def markup_only(doc):
+    """The page's real HTML: drops comments and <script>/<style>/<template>/<noscript> bodies, so links built by JS
+    (e.g. a JS template literal `href="${f.url}"` inside an inline script) are not crawled as dead links."""
+    return re.sub(r"(?is)<!--.*?-->|<(script|style|template|noscript)\b.*?</\1>", " ", doc)
+
+
 def visible_text(doc):
     doc = re.sub(r"(?is)<!--.*?-->|<(script|style|noscript|svg)\b.*?</\1>", " ", doc)
     return html.unescape(re.sub(r"<[^>]+>", " ", doc))
@@ -131,7 +137,9 @@ def audit_site(site, deadline):
             warn.append(f"{path} no canonical")
         if DASH_RE.search(title + " " + desc + " " + visible_text(doc)):
             dash_pages += 1
-        for href in re.findall(r'<a\b[^>]*href=["\']([^"\'#]+)', doc, re.I):
+        for href in re.findall(r'<a\b[^>]*href=["\']([^"\'#]+)', markup_only(doc), re.I):
+            if "${" in href or "{{" in href:  # unrendered template placeholder, not a real URL
+                continue
             full = urldefrag(urljoin(p["url"], href.strip()))[0]
             if (urlparse(full).hostname or "").replace("www.", "") == d and not re.search(r"\.(pdf|jpe?g|png|webp|zip)$", full, re.I):
                 internal.add(full)
