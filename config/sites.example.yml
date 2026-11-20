@@ -1,0 +1,19 @@
+# Copy to sites.yml (gitignored) and fill in your real sites.
+sites:
+  - domain: example.com
+    host: vps            # vps | shared | external
+    checks:
+      uptime: true
+      expect_content: "Example Domain"   # string that must appear on /
+      ssl: true
+      form:
+        via: relay                 # probe the local form relay's /health (never submits)
+      playwright: true
+      page_weight: true            # default; false to skip the daily homepage-bytes check
+    latency_budget_ms: 800         # optional; default 800 for host: vps, 2000 otherwise
+    deploy:                        # optional; enables "deploy <site>" command
+      repo: yourname/example-website
+      target: /var/www/example.com
+      post_deploy_smoke: true
+    dns_provider: hostinger        # which adapter manages DNS for this domain
+    notes: ""

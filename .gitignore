@@ -1,0 +1,23 @@
+# Real configuration, examples ship, reality doesn't
+config/*.yml
+!config/*.example.yml
+
+# Real routines (copy from the .example.md files)
+routines/*.md
+!routines/*.example.md
+
+# Operator-private context, state, logs, secrets
+private/
+state/
+logs/
+.env
+*.pem
+*.key
+*.ppk
+
+# Runtime
+node_modules/
+__pycache__/
+.venv/
+.DS_Store
+scripts/deploy.env
